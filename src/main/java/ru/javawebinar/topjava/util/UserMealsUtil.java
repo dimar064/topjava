@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.Month;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class UserMealsUtil {
     public static void main(String[] args) {
@@ -30,14 +31,27 @@ public class UserMealsUtil {
     public static List<UserMealWithExcess> filteredByCycles(List<UserMeal> meals, LocalTime startTime, LocalTime endTime, int caloriesPerDay) {
         List<UserMealWithExcess> mealsWithExcess = new ArrayList<>();
         Map<LocalDate, Integer> mapCaloriesPerDay = new HashMap<>();
+        Map<LocalDate, AtomicBoolean> excessPerDates = new HashMap<>();
+        LocalDate date;
         for (UserMeal meal : meals) {
             mapCaloriesPerDay.merge(meal.getDateTime().toLocalDate(), meal.getCalories(), Integer::sum);
-        }
-        for (UserMeal meal : meals) {
-            Integer totalColoriesPerDay = mapCaloriesPerDay.get(
-                    meal.getDateTime().toLocalDate());
-            if (TimeUtil.isBetweenHalfOpen(meal.getDateTime().toLocalTime(), startTime, endTime))
-                mealsWithExcess.add(new UserMealWithExcess(meal.getDateTime(), meal.getDescription(), meal.getCalories(), totalColoriesPerDay > caloriesPerDay));
+            date = meal.getDateTime().toLocalDate();
+            if (excessPerDates.containsKey(date)) {
+                excessPerDates.get(date).set(mapCaloriesPerDay.get(date) > caloriesPerDay);
+            } else {
+                excessPerDates.put(date, new AtomicBoolean(mapCaloriesPerDay.get(date) > caloriesPerDay));
+            }
+            if (TimeUtil.isBetweenHalfOpen(meal.getDateTime().toLocalTime(), startTime, endTime)) {
+                mealsWithExcess.add(
+                        new UserMealWithExcess(
+                                meal.getDateTime(),
+                                meal.getDescription(),
+                                meal.getCalories(),
+                                excessPerDates.get(date)
+                        )
+
+                );
+            }
         }
         return mealsWithExcess;
     }
